@@ -60,5 +60,6 @@ variables, and module-by-module breakdown.
   and no cross-imports between the two.
 - Generated artefacts — `equity/cache/`, `equity/raw_data/`, `equity/results/`, `node_modules/`,
   virtualenvs — are gitignored and recreated by running the projects.
-- `credit/BL_Credit_Optimiser.jsx` is an earlier standalone copy of the app, superseded by
-  `credit/src/App.jsx`. Kept for reference only; it is not part of the Vite build.
+- `equity/market_implied_returns/` holds a small set of standalone output CSVs carried over
+  from the original project. Nothing in this repo regenerates them, so they are tracked in git
+  rather than gitignored like the other outputs.
