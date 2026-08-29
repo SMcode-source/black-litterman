@@ -11,7 +11,7 @@ priors and views, and solves the constrained portfolio problem — entirely in t
 
 | | Equities | Credit |
 |---|---|---|
-| Universe | S&P 500 (~485 usable names) | Sample IG corporate bonds (25 issuers) |
+| Universe | S&P 500, ~485 of 503 usable | Sample IG corporate bonds, 25 issuers |
 | Data | Yahoo Finance, refreshed every weekday | Bundled sample universe |
 | Covariance | Daily log returns, annualised | OAS × spread duration, sector/rating correlation |
 | Extra analytics | — | Expected loss, spread duration, DTS, Credit VaR |
@@ -23,26 +23,35 @@ Both asset classes run through the same engine (`app/src/blcore.js`). You contro
 - **Views** — absolute ("NVDA returns 40%") or relative ("AAPL beats MSFT by 10%"), each with
   its own confidence, which sets the corresponding diagonal entry of Ω
 
-## Why it can optimise 485 names in a browser
+## Why it can optimise the whole index in a browser
 
-A textbook implementation inverts the N×N covariance. At N = 485 that is ~10⁸ operations and
-will lock the tab. Two choices avoid it entirely:
+A textbook implementation inverts the N×N covariance. At N ≈ 485 that is ~10⁸ operations and
+will lock the tab. Four choices avoid it:
 
-1. **The posterior uses the view-space form**
+1. **The posterior is formed in view space.**
 
    `μ_BL = π + τΣPᵀ(PτΣPᵀ + Ω)⁻¹(Q − Pπ)`
 
    The only matrix inverted is **K×K**, where K is the number of views — usually two or three.
+   The covariance is never inverted at all.
 
 2. **The posterior covariance is never materialised.** `Σ_post` is `Σ` plus a rank-K correction,
    so it is exposed as an operator with a `mul(v)` method costing O(N² + KN). The optimiser —
    a spectral projected gradient with Barzilai-Borwein steps — needs nothing else.
 
-The covariance is stored as `float32`. The matrix-vector product is memory-bandwidth bound
-rather than compute bound, so halving the bytes (1.88 MB → 940 KB) roughly doubled throughput.
+3. **The covariance stays `float32`.** The matvec is memory-bandwidth bound rather than compute
+   bound, so halving the bytes (1.88 MB → 940 KB) roughly doubled throughput. This was the
+   single largest speedup, and it is not an algorithmic one.
 
-Full universe with one view: **around a second in the browser** -- roughly 1300
-projected-gradient iterations over 485 names, no worker thread, no server.
+4. **The solver stops when it is converged**, testing the stationarity residual under a fixed
+   `1/L` step — zero exactly at a KKT point. The obvious alternative, asking whether the last
+   step moved anything, is meaningless for Barzilai-Borwein: its step size swings over orders
+   of magnitude by design, so a small step means either "converged" or "α is small right now".
+
+A solve with views converges in **~600 iterations**; with no views it takes ~1450, since what
+remains is the poorly conditioned minimum-variance direction. The full pipeline over 485 names
+measures **163 ms** on a CI runner. Budget more like a second in a browser — no worker thread,
+no server, nothing leaves the tab.
 
 ## Repository layout
 
@@ -99,11 +108,15 @@ To verify the engine against whatever snapshot you have:
 node data-pipeline/check_engine.mjs
 ```
 
-This checks the covariance is symmetric and PSD, that reverse optimisation round-trips (with
-τ→0 and no views the optimiser must return the benchmark exactly), that views move the
-posterior in the right direction and monotonically in confidence, that relative views widen
-the right spread without overshooting, that position caps bind, and that the default iteration
-budget is converged.
+It asserts that the covariance is symmetric and PSD; that reverse optimisation round-trips,
+since with τ→0 and no views the optimiser must return the benchmark exactly; that the answer at
+the default tolerance is unchanged by running 10x longer; that views move the posterior in the
+right direction and monotonically in confidence; that a relative view widens the right spread
+without overshooting it; that position caps bind under an extreme view; and that a full-universe
+solve still finishes in seconds.
+
+The same run gates every deploy, against the snapshot fetched minutes earlier -- so a Yahoo
+change that quietly corrupts the covariance fails the build rather than reaching the site.
 
 ### The optional backend
 

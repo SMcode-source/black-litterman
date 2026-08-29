@@ -34,7 +34,8 @@ equity tab shows an error banner and the credit tab still works — its universe
 equilibriumReturns(cov, wBmk, delta, n)     pi = delta * Sigma * w_bmk
 buildViews(views, indexOf, cov, tau, n)     -> P rows, Q, Omega (He-Litterman)
 posterior(cov, pi, viewRows, tau, n)        -> { muBL, sigmaOp }
-optimise({ mu, sigmaOp, delta, n, lo, hi }) -> { w, iters, status }
+optimise({ mu, sigmaOp, delta, n, lo, hi,
+          w0, iters, tol })                -> { w, iters, status }
 portfolioStats({ w, wBmk, mu, cov, ... })   return, vol, Sharpe, tracking error
 groupWeights(items, w, wBmk, key)           aggregate by sector / rating
 ```
@@ -52,6 +53,25 @@ float64 writes per solve for no benefit — the optimiser only ever needs `Σ_po
 (L from power iteration on `sigmaOp`), and a Euclidean projection onto
 `{w : Σw = 1, lo ≤ w ≤ hi}` by bisection on the shift θ. Every buffer is preallocated and the
 loop swaps references rather than allocating, so the steady state does no GC work.
+
+**Stopping rule.** Convergence is measured as the stationarity residual under the *fixed* `1/L`
+step — `‖P(w − g/L) − w‖∞`, which is zero exactly at a KKT point of the projected problem.
+Testing the actual BB step instead does not work: BB varies α over orders of magnitude by
+design, so a small step is equally consistent with "converged" and "α is small right now". The
+residual costs one extra projection, so it is checked every 20th iteration, under 1% overhead
+against the matvec.
+
+`tol` defaults to `1e-9`, chosen against a 40,000-iteration reference rather than by feel:
+
+| `tol` | iterations (no views / 1 view) | max weight error |
+|---|---|---|
+| 1e-9 | 1441 / 601 | 7.5e-6 — a thousandth of a percentage point |
+| 1e-8 | 1061 / 421 | 2.8e-4 — 0.03pp, visible at the displayed precision |
+| 1e-7 | 321 / 241 | 2.5e-3 — 0.25pp, wrong |
+
+`iters` (default 2000) is only a backstop; at the default tolerance nothing reaches it. The
+no-view case is the slow one — with the views gone, what is left is the poorly conditioned
+minimum-variance direction.
 
 ### `datasets.js`
 

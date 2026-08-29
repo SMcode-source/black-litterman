@@ -3,10 +3,19 @@
  *
  *   node data-pipeline/check_engine.mjs
  *
- * The load-bearing check is #1: with no views the posterior equals the prior,
- * so the optimiser must reproduce the benchmark almost exactly. If tracking
- * error is not ~0 there, the solver has not converged and every downstream
+ * Two checks carry the weight.
+ *
+ * #1 is the round trip: with tau -> 0 and no views the posterior equals the
+ * prior, and since pi was built as delta*Sigma*w_bmk the optimiser must return
+ * the benchmark exactly. If tracking error is not ~0 there, every downstream
  * number is quietly wrong.
+ *
+ * #1b is the one that matters for the stopping rule: the answer at the default
+ * tolerance must be identical to the answer after 10x the iterations. Note
+ * that this check passed for the wrong reason for a while -- the old stopping
+ * test could never fire, so both runs were simply truncated at the same place.
+ * It only tests anything once the solver can actually stop early, which is why
+ * the iteration count is printed rather than just the drift.
  */
 import { readFileSync } from "node:fs";
 import {
