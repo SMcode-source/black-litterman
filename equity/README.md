@@ -1,5 +1,14 @@
 # Black-Litterman Model for S&P 500 Stocks
 
+> This is the **original standalone batch model** — the Python pipeline the equity side of the
+> project grew out of. It runs offline and writes CSVs plus a matplotlib chart.
+>
+> For the interactive version, see the app at
+> [smcode-source.github.io/black-litterman](https://smcode-source.github.io/black-litterman/),
+> built from [`app/`](../app) with its data snapshot from [`data-pipeline/`](../data-pipeline).
+> The two are independent: this one keeps its own cache, its own config, and its own outputs,
+> and nothing here runs at deploy time.
+
 A comprehensive implementation of the Black-Litterman portfolio optimization model for all S&P 500 stocks using Yahoo Finance API.
 
 ## Overview
@@ -68,11 +77,25 @@ Edit `config.py` to customize model parameters:
 ```python
 RISK_FREE_RATE = 0.04            # Risk-free rate (4%)
 MARKET_RISK_PREMIUM = 0.05       # Market risk premium (5%)
+DATA_START_DATE = "2020-01-01"   # Fetch window, start
+DATA_END_DATE = "2025-12-31"     # Fetch window, end
 TAU = 0.05                        # Prior uncertainty parameter
 CONFIDENCE = 0.95                 # Confidence in investor views
 MIN_WEIGHT = 0.0                  # Minimum asset weight
 MAX_WEIGHT = 0.1                  # Maximum asset weight (10%)
+TOP_N_STOCKS = 50                 # How many stocks to print in the results table
+OUTPUT_RESULTS = True             # Write CSVs to results/
+PLOT_RESULTS = True               # Write bl_analysis.png
 ```
+
+**The fetch window is a fixed date range, not a rolling one.** `DATA_END_DATE` is hard-coded, so
+the model silently stops at that date however long after it you run — push it forward before
+reading anything into a run as "current". The app in `app/` has no such problem; its snapshot
+is refetched to the previous close on every deploy.
+
+**Paths are relative to the working directory, not the script.** `cache/`, `raw_data/` and
+`results/` are created wherever you invoke `python main.py` from, so run it from inside
+`equity/` or the output lands somewhere you did not intend.
 
 ## Usage
 

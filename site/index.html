@@ -197,18 +197,21 @@
   <section>
     <h3>How it holds up</h3>
     <div class="facts">
-      <div class="fact"><div class="n">485</div><div class="l">S&amp;P 500 names, optimised at once</div></div>
+      <div class="fact"><div class="n">~485</div><div class="l">S&amp;P 500 names, optimised at once</div></div>
       <div class="fact"><div class="n">~1s</div><div class="l">to solve the full universe in-browser</div></div>
       <div class="fact"><div class="n">K&times;K</div><div class="l">the only matrix inverted, K = your view count</div></div>
       <div class="fact"><div class="n">0</div><div class="l">servers &mdash; nothing leaves your browser</div></div>
     </div>
     <p class="note">
-      A textbook Black-Litterman implementation inverts the N&times;N covariance, which at 485 names
+      A textbook Black-Litterman implementation inverts the N&times;N covariance, which at ~485 names
       is roughly 10<sup>8</sup> operations and locks the tab. This one uses the view-space form of the
       posterior, so the only inverse is K&times;K where K is the number of views you wrote &mdash;
-      usually two or three. The optimiser then needs nothing but matrix-vector products.
+      usually two or three. The optimiser then needs nothing but matrix-vector products, and it
+      stops on a stationarity test rather than burning a fixed iteration budget, so a solve with
+      views settles in a few hundred passes.
       Correctness is checked on every deploy against the freshly fetched data, including a
-      reverse-optimisation round trip that must return the benchmark exactly.
+      reverse-optimisation round trip that must return the benchmark exactly &mdash; if Yahoo
+      ships something that breaks the covariance, the build fails instead of the site.
     </p>
   </section>
 

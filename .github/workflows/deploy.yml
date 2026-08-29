@@ -62,8 +62,9 @@ jobs:
         working-directory: app
         run: npm ci
 
-      # No VITE_API_URL: the app runs its own engine in the browser, so the
-      # published site is fully self-contained with no backend to call.
+      # No backend URL is configured because there is nothing to configure:
+      # the app solves in the browser and makes no API call, so the published
+      # site is self-contained.
       - name: Build app
         working-directory: app
         run: npm run build
