@@ -316,7 +316,7 @@ function spectralNorm(op, n, iters = 24) {
  * so 500 names cost ~250k multiply-adds per step -- a few hundred steps runs in
  * well under a second.
  */
-export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, iters = 2000, tol = 1e-13 }) {
+export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, iters = 2000, tol = 1e-9 }) {
   // Spectral projected gradient (Barzilai-Borwein steps).
   //
   // A fixed 1/L step is far too conservative here: equity covariances are badly
@@ -335,6 +335,7 @@ export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, ite
   let gNext = new Float64Array(n);
   const cand = new Float64Array(n);
   const scratch = new Float64Array(n);
+  const probe = new Float64Array(n);
 
   w.set(w0 ? w0 : new Float64Array(n).fill(1 / n));
   projectToSimplexBox(Float64Array.from(w), lo, hi, n, w);
@@ -349,15 +350,47 @@ export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, ite
   gradInto(w, g);
   let itersRun = 0;
 
+  // Stationarity residual, checked every CHECK_EVERY iterations.
+  //
+  // The obvious test -- "did the last step move anything?" -- does not work for
+  // BB. Its step size swings over orders of magnitude by design, so a small
+  // step can mean either "converged" or "alpha happens to be tiny right now",
+  // and the two are indistinguishable. The residual below uses the *fixed* 1/L
+  // step instead, which is zero exactly at a KKT point of the projected
+  // problem, so it measures optimality rather than step length.
+  //
+  // It costs one extra projection, hence the stride: at CHECK_EVERY = 20 the
+  // overhead is under 1% of the matvec that dominates each iteration.
+  //
+  // The default tol of 1e-9 was picked against a 40k-iteration reference: it
+  // lands within 1e-5 of it in weight -- a thousandth of a percentage point,
+  // three orders below what the UI displays -- with return and volatility
+  // identical to four decimal places in basis points. Loosening to 1e-8 starts
+  // to move weights in the second decimal of a percent, which is visible.
+  const CHECK_EVERY = 20;
+  const stationarity = () => {
+    for (let i = 0; i < n; i++) cand[i] = w[i] - g[i] / L;
+    projectToSimplexBox(cand, lo, hi, n, probe);
+    let res = 0;
+    for (let i = 0; i < n; i++) res = Math.max(res, Math.abs(probe[i] - w[i]));
+    return res;
+  };
+
   for (let it = 0; it < iters; it++) {
     itersRun = it + 1;
+
+    // `w` and `g` are consistent here, so this tests the iterate we would
+    // return, and breaking leaves the answer already in `w`.
+    if (it % CHECK_EVERY === 0 && stationarity() < tol) break;
 
     for (let i = 0; i < n; i++) cand[i] = w[i] - alpha * g[i];
     projectToSimplexBox(cand, lo, hi, n, next);
 
     let shift = 0;
     for (let i = 0; i < n; i++) shift += Math.abs(next[i] - w[i]);
-    if (shift < tol) { const t = w; w = next; next = t; break; }
+    // An exactly zero step is a fixed point of the projected map, so w is
+    // already stationary regardless of alpha.
+    if (shift === 0) break;
 
     gradInto(next, gNext);
 
