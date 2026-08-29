@@ -3,6 +3,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    # 23:00 UTC on weekdays -- comfortably after the US close, so each run
+    # picks up a complete trading day.
+    - cron: "0 23 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -21,27 +25,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ---- Yahoo Finance snapshot -------------------------------------
+      # Yahoo serves no CORS headers, so the browser cannot call it. We fetch
+      # here instead and ship the result as a static asset. If this step fails
+      # the whole job fails by design: better to keep the last good deploy
+      # serving real data than to publish an app with no universe to optimise.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data-pipeline/requirements.txt
+
+      - name: Install data pipeline dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      - name: Fetch S&P 500 snapshot from Yahoo Finance
+        run: python data-pipeline/fetch_equity_data.py --out app/public/data
+
+      - name: Show snapshot summary
+        run: |
+          ls -lh app/public/data
+          python -c "import json;m=json.load(open('app/public/data/equity_universe.json'))['meta'];print(m)"
+
+      # ---- engine checks ----------------------------------------------
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
-          cache-dependency-path: credit/package-lock.json
+          cache-dependency-path: app/package-lock.json
 
-      - name: Install credit app dependencies
-        working-directory: credit
+      - name: Verify the optimiser against the fresh snapshot
+        run: node data-pipeline/check_engine.mjs
+
+      # ---- build -------------------------------------------------------
+      - name: Install app dependencies
+        working-directory: app
         run: npm ci
 
-      # No VITE_API_URL: the app builds in browser-engine mode, so the
+      # No VITE_API_URL: the app runs its own engine in the browser, so the
       # published site is fully self-contained with no backend to call.
-      - name: Build credit app
-        working-directory: credit
+      - name: Build app
+        working-directory: app
         run: npm run build
 
       - name: Assemble site
         run: |
           mkdir -p _site
           cp site/index.html _site/index.html
-          cp -r credit/dist _site/credit
+          cp -r app/dist _site/app
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

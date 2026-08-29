@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Black-Litterman — Equity &amp; Credit Portfolio Optimisation</title>
-<meta name="description" content="Two Black-Litterman portfolio optimisation projects: an S&amp;P 500 equity model and an interactive investment-grade credit optimiser.">
+<meta name="description" content="An interactive Black-Litterman optimiser for S&amp;P 500 equities and investment-grade credit. Live Yahoo Finance data, your own priors and views, solved in the browser.">
 <style>
   :root{
     --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f1f3f7; --line:#dfe3ea;
     --ink:#161a22; --ink-2:#4a5568; --ink-3:#78808f;
-    --accent:#1f6feb; --accent-ink:#ffffff; --credit:#0f9488; --equity:#b45309;
+    --accent:#1f6feb; --accent-ink:#ffffff; --equity:#1f6feb; --credit:#0f9488;
     --shadow:0 1px 2px rgba(16,24,40,.05), 0 8px 24px -12px rgba(16,24,40,.18);
   }
   @media (prefers-color-scheme:dark){
     :root{
       --bg:#0c1015; --surface:#141a22; --surface-2:#1b232d; --line:#28323f;
       --ink:#e9eef5; --ink-2:#a5b0c0; --ink-3:#7b8798;
-      --accent:#4f9bff; --accent-ink:#08111d; --credit:#2dd4bf; --equity:#fbbf24;
+      --accent:#4f9bff; --accent-ink:#08111d; --equity:#4f9bff; --credit:#2dd4bf;
       --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
     }
   }
@@ -27,86 +27,88 @@
     font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
   a{color:var(--accent);text-decoration:none}
   a:hover{text-decoration:underline}
   code,.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;font-size:.875em}
 
-  /* ---------- header ---------- */
+  /* ---------- hero ---------- */
   header{border-bottom:1px solid var(--line);background:var(--surface)}
-  .head{padding:64px 0 52px}
+  .head{padding:60px 0 48px}
   .eyebrow{
     display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
     color:var(--ink-3);margin:0 0 14px
   }
   h1{margin:0 0 16px;font-size:clamp(30px,5vw,46px);line-height:1.1;letter-spacing:-.025em;font-weight:680}
-  .lede{margin:0;max-width:62ch;font-size:clamp(16px,2.2vw,18.5px);color:var(--ink-2)}
+  .lede{margin:0 0 28px;max-width:60ch;font-size:clamp(16px,2.2vw,18.5px);color:var(--ink-2)}
   .lede strong{color:var(--ink);font-weight:600}
-
-  /* ---------- shared-core band ---------- */
-  .core{background:var(--surface-2);border-bottom:1px solid var(--line);padding:30px 0}
-  .core-inner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-  .core-label{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-right:4px}
-  .step{
-    display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
-    border-radius:999px;padding:7px 15px;font-size:13.5px;font-weight:500;color:var(--ink);box-shadow:var(--shadow)
-  }
-  .step i{font-style:normal;color:var(--ink-3);font-size:12px;font-weight:600}
-  .arrow{color:var(--ink-3);font-size:15px;user-select:none}
-
-  /* ---------- project cards ---------- */
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:24px;padding:52px 0}
-  .card{
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;
-    box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden
-  }
-  .card-top{height:3px}
-  .card--credit .card-top{background:var(--credit)}
-  .card--equity .card-top{background:var(--equity)}
-  .card-body{padding:26px 26px 24px;display:flex;flex-direction:column;flex:1}
-  .tag{
-    align-self:flex-start;font-size:11.5px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;
-    padding:4px 10px;border-radius:6px;margin-bottom:14px
-  }
-  .card--credit .tag{color:var(--credit);background:color-mix(in srgb,var(--credit) 13%,transparent)}
-  .card--equity .tag{color:var(--equity);background:color-mix(in srgb,var(--equity) 15%,transparent)}
-  .card h2{margin:0 0 8px;font-size:21px;letter-spacing:-.015em;font-weight:650}
-  .card p{margin:0 0 18px;color:var(--ink-2);font-size:15px}
-  ul.feat{margin:0 0 22px;padding:0;list-style:none;font-size:14.5px}
-  ul.feat li{position:relative;padding-left:20px;margin-bottom:7px;color:var(--ink-2)}
-  ul.feat li::before{content:"";position:absolute;left:4px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
-  ul.feat li b{color:var(--ink);font-weight:600}
-  .spacer{flex:1}
-  .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
   .btn{
-    display:inline-flex;align-items:center;gap:8px;border-radius:9px;padding:11px 18px;
-    font-size:14.5px;font-weight:600;border:1px solid transparent;cursor:pointer
+    display:inline-flex;align-items:center;gap:8px;border-radius:9px;padding:12px 20px;
+    font-size:15px;font-weight:600;border:1px solid transparent
   }
   .btn-primary{background:var(--accent);color:var(--accent-ink)}
   .btn-primary:hover{filter:brightness(1.08);text-decoration:none}
   .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
   .btn-ghost:hover{background:var(--surface-2);text-decoration:none}
-  .runlocal{
-    margin-top:16px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;
-    padding:13px 15px;font-size:13px;color:var(--ink-2)
+  .live{
+    display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-3);
+    margin-left:4px
   }
-  .runlocal .mono{display:block;color:var(--ink);margin-top:6px;white-space:pre;overflow-x:auto}
-  .note{
-    margin-top:16px;font-size:13px;color:var(--ink-3);border-left:2px solid var(--line);padding-left:12px
-  }
+  .dot{width:7px;height:7px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
 
-  /* ---------- comparison table ---------- */
-  section.compare{padding:8px 0 56px}
+  /* ---------- pipeline ---------- */
+  .core{background:var(--surface-2);border-bottom:1px solid var(--line);padding:28px 0}
+  .core-inner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+  .core-label{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-right:6px}
+  .step{
+    display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+    border-radius:999px;padding:7px 15px;font-size:13.5px;font-weight:500;box-shadow:var(--shadow)
+  }
+  .step i{font-style:normal;color:var(--ink-3);font-size:12px;font-weight:600}
+  .step.you{border-color:var(--accent);color:var(--accent)}
+  .step.you i{color:var(--accent)}
+  .arrow{color:var(--ink-3);font-size:15px;user-select:none}
+
+  /* ---------- sections ---------- */
+  h2{font-size:20px;letter-spacing:-.015em;font-weight:650;margin:0 0 8px}
   h3{font-size:13px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 18px}
-  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
-  table{border-collapse:collapse;width:100%;min-width:620px;font-size:14.5px}
-  th,td{text-align:left;padding:13px 18px;border-bottom:1px solid var(--line);vertical-align:top}
-  thead th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:650;background:var(--surface-2)}
-  tbody tr:last-child th,tbody tr:last-child td{border-bottom:none}
-  tbody th{font-weight:600;color:var(--ink);width:190px}
-  td{color:var(--ink-2)}
+  section{padding:48px 0}
+  section + section{border-top:1px solid var(--line)}
 
-  footer{border-top:1px solid var(--line);background:var(--surface);padding:30px 0;font-size:14px;color:var(--ink-3)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .card-top{height:3px}
+  .card--equity .card-top{background:var(--equity)}
+  .card--credit .card-top{background:var(--credit)}
+  .card-body{padding:24px}
+  .tag{
+    display:inline-block;font-size:11.5px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;
+    padding:4px 10px;border-radius:6px;margin-bottom:14px
+  }
+  .card--equity .tag{color:var(--equity);background:color-mix(in srgb,var(--equity) 13%,transparent)}
+  .card--credit .tag{color:var(--credit);background:color-mix(in srgb,var(--credit) 14%,transparent)}
+  .card p{margin:0 0 16px;color:var(--ink-2);font-size:15px}
+  ul.feat{margin:0;padding:0;list-style:none;font-size:14.5px}
+  ul.feat li{position:relative;padding-left:20px;margin-bottom:7px;color:var(--ink-2)}
+  ul.feat li::before{content:"";position:absolute;left:4px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
+  ul.feat li b{color:var(--ink);font-weight:600}
+
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px}
+  .fact{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+  .fact .n{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+  .fact .l{font-size:12.5px;color:var(--ink-3);margin-top:5px}
+
+  .note{
+    margin-top:22px;font-size:13.5px;color:var(--ink-3);border-left:2px solid var(--line);padding-left:14px
+  }
+  .runlocal{
+    background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;font-size:13.5px;color:var(--ink-2);margin-top:14px
+  }
+  .runlocal .mono{display:block;color:var(--ink);margin-top:8px;white-space:pre;overflow-x:auto}
+
+  footer{border-top:1px solid var(--line);background:var(--surface);padding:28px 0;font-size:14px;color:var(--ink-3)}
   .foot{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between}
 </style>
 </head>
@@ -117,112 +119,119 @@
     <p class="eyebrow">Portfolio Optimisation</p>
     <h1>Black-Litterman</h1>
     <p class="lede">
-      Two implementations of the Black-Litterman framework, sharing one Bayesian core but built for
-      different asset classes: an <strong>S&amp;P 500 equity model</strong> that runs as a Python
-      pipeline, and an <strong>investment-grade credit optimiser</strong> you can use right here in
-      the browser.
+      An interactive optimiser for <strong>S&amp;P 500 equities</strong> and
+      <strong>investment-grade credit</strong>, in one app. It starts from the returns the
+      market already implies, then blends in <strong>your priors and your views</strong> —
+      and solves the whole thing in your browser.
     </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="./app/">Open the optimiser &rarr;</a>
+      <a class="btn btn-ghost" href="https://github.com/SMcode-source/black-litterman">Source</a>
+      <span class="live"><span class="dot"></span> Yahoo Finance data, refreshed every weekday</span>
+    </div>
   </div>
 </header>
 
 <div class="core">
   <div class="wrap core-inner">
-    <span class="core-label">Shared core</span>
+    <span class="core-label">Pipeline</span>
     <span class="step"><i>01</i> Market-implied returns</span>
     <span class="arrow">&rarr;</span>
-    <span class="step"><i>02</i> Investor views</span>
+    <span class="step you"><i>02</i> Your prior</span>
     <span class="arrow">&rarr;</span>
-    <span class="step"><i>03</i> Bayesian posterior</span>
+    <span class="step you"><i>03</i> Your views</span>
     <span class="arrow">&rarr;</span>
-    <span class="step"><i>04</i> Constrained optimisation</span>
+    <span class="step"><i>04</i> Bayesian posterior</span>
+    <span class="arrow">&rarr;</span>
+    <span class="step"><i>05</i> Constrained optimisation</span>
   </div>
 </div>
 
 <main class="wrap">
-  <div class="grid">
 
-    <!-- ============ CREDIT ============ -->
-    <article class="card card--credit">
-      <div class="card-top"></div>
-      <div class="card-body">
-        <span class="tag">Live &amp; interactive</span>
-        <h2>Credit Optimiser</h2>
-        <p>
-          Black-Litterman for investment-grade corporate bonds, with credit-specific risk analytics
-          layered on top of the return model.
-        </p>
-        <ul class="feat">
-          <li><b>Views</b> &mdash; absolute and relative, with per-view confidence</li>
-          <li><b>Constraints</b> &mdash; issuer limits, position sizing, tracking error</li>
-          <li><b>Credit risk</b> &mdash; expected loss, spread duration, DTS, Credit VaR</li>
-          <li><b>Allocation</b> &mdash; sector and rating breakdowns vs benchmark</li>
-        </ul>
-        <div class="spacer"></div>
-        <div class="actions">
-          <a class="btn btn-primary" href="./credit/">Open the app &rarr;</a>
-          <a class="btn btn-ghost" href="https://github.com/SMcode-source/black-litterman/tree/main/credit">Source</a>
+  <section>
+    <h3>What you control</h3>
+    <div class="grid">
+      <div class="card card--equity">
+        <div class="card-top"></div>
+        <div class="card-body">
+          <span class="tag">Equities</span>
+          <h2>S&amp;P 500, live from Yahoo</h2>
+          <p>
+            The full index, with prices and market caps pulled from Yahoo Finance and the
+            covariance estimated over several years of daily returns.
+          </p>
+          <ul class="feat">
+            <li><b>Pick your universe</b> &mdash; all of it, the top 25/50/100 by size, or any subset</li>
+            <li><b>Set the prior</b> &mdash; risk aversion and tau, or hand-edit the implied returns</li>
+            <li><b>State your views</b> &mdash; absolute or relative, each with its own confidence</li>
+            <li><b>Constrain it</b> &mdash; long-only, position caps, weights that sum to 100%</li>
+          </ul>
         </div>
-        <p class="note">
-          Runs entirely in your browser &mdash; no server, no data leaves the page. Credit VaR is
-          computed parametrically at 99%. The full Python backend adds a cvxpy solver, Monte&nbsp;Carlo
-          VaR/CVaR, and bond-file upload; run it locally to enable those.
-        </p>
       </div>
-    </article>
 
-    <!-- ============ EQUITY ============ -->
-    <article class="card card--equity">
-      <div class="card-top"></div>
-      <div class="card-body">
-        <span class="tag">Python pipeline</span>
-        <h2>S&amp;P 500 Equity Model</h2>
-        <p>
-          A batch pipeline covering the full S&amp;P 500: it fetches prices and market caps, derives
-          equilibrium returns, applies views, and optimises with position constraints.
-        </p>
-        <ul class="feat">
-          <li><b>Universe</b> &mdash; ~500 constituents via Yahoo Finance, no API key</li>
-          <li><b>Prior</b> &mdash; reverse optimisation from market-cap weights</li>
-          <li><b>Views</b> &mdash; top quartile by implied return, adjusted upward 20%</li>
-          <li><b>Limits</b> &mdash; long-only, 10% maximum per position</li>
-        </ul>
-        <div class="spacer"></div>
-        <div class="actions">
-          <a class="btn btn-ghost" href="https://github.com/SMcode-source/black-litterman/tree/main/equity">Source</a>
+      <div class="card card--credit">
+        <div class="card-top"></div>
+        <div class="card-body">
+          <span class="tag">Credit</span>
+          <h2>Investment-grade corporates</h2>
+          <p>
+            The same Bayesian core applied to a sample IG bond universe, with the credit
+            analytics equities do not have.
+          </p>
+          <ul class="feat">
+            <li><b>Credit risk</b> &mdash; expected loss, spread duration, DTS, Credit VaR</li>
+            <li><b>Spread-based covariance</b> &mdash; OAS &times; duration, sector and rating correlation</li>
+            <li><b>Allocation</b> &mdash; sector and rating breakdowns against the benchmark</li>
+            <li><b>Same controls</b> &mdash; identical prior, view and constraint machinery</li>
+          </ul>
         </div>
-        <div class="runlocal">
-          Runs locally &mdash; it writes CSVs and a matplotlib chart, so there is nothing to serve here.
-          <span class="mono">cd equity
+      </div>
+    </div>
+    <p class="note">
+      Bond-level analytics (OAS, spread duration, PD/LGD) are not available from Yahoo, so the
+      credit side ships a curated sample universe rather than live market data.
+    </p>
+  </section>
+
+  <section>
+    <h3>How it holds up</h3>
+    <div class="facts">
+      <div class="fact"><div class="n">485</div><div class="l">S&amp;P 500 names, optimised at once</div></div>
+      <div class="fact"><div class="n">~1s</div><div class="l">to solve the full universe in-browser</div></div>
+      <div class="fact"><div class="n">K&times;K</div><div class="l">the only matrix inverted, K = your view count</div></div>
+      <div class="fact"><div class="n">0</div><div class="l">servers &mdash; nothing leaves your browser</div></div>
+    </div>
+    <p class="note">
+      A textbook Black-Litterman implementation inverts the N&times;N covariance, which at 485 names
+      is roughly 10<sup>8</sup> operations and locks the tab. This one uses the view-space form of the
+      posterior, so the only inverse is K&times;K where K is the number of views you wrote &mdash;
+      usually two or three. The optimiser then needs nothing but matrix-vector products.
+      Correctness is checked on every deploy against the freshly fetched data, including a
+      reverse-optimisation round trip that must return the benchmark exactly.
+    </p>
+  </section>
+
+  <section>
+    <h3>Also in the repository</h3>
+    <h2>The original Python pipeline</h2>
+    <p style="color:var(--ink-2);max-width:62ch;margin:0">
+      The equity model started as a batch Python program, and that version is still here. It runs
+      the same method offline over the full index and writes CSVs plus a matplotlib summary chart.
+    </p>
+    <div class="runlocal">
+      Runs locally &mdash; it writes files rather than serving a page.
+      <span class="mono">cd equity
 pip install -r requirements.txt
 python main.py</span>
-        </div>
-        <p class="note">
-          First run fetches all constituents (roughly 5&ndash;10 minutes), then caches the data so
-          later runs are instant.
-        </p>
-      </div>
-    </article>
-
-  </div>
-
-  <section class="compare">
-    <h3>Side by side</h3>
-    <div class="tablewrap">
-      <table>
-        <thead>
-          <tr><th scope="col"></th><th scope="col">Credit Optimiser</th><th scope="col">Equity Model</th></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">Asset class</th><td>IG corporate bonds</td><td>S&amp;P 500 equities</td></tr>
-          <tr><th scope="row">Form</th><td>React single-page app</td><td>Python CLI / batch</td></tr>
-          <tr><th scope="row">Risk model</th><td>Spread-based covariance</td><td>Return covariance, annualised</td></tr>
-          <tr><th scope="row">Optimiser</th><td>Gradient projection in-browser; cvxpy on the backend</td><td>scipy constrained optimisation</td></tr>
-          <tr><th scope="row">Views</th><td>User-defined, absolute or relative</td><td>Generated from implied-return quantiles</td></tr>
-          <tr><th scope="row">Output</th><td>Interactive charts and tables</td><td>CSV exports and a summary plot</td></tr>
-        </tbody>
-      </table>
     </div>
+    <p class="note">
+      The credit app also has a FastAPI backend in <code>app/backend/</code> that adds a cvxpy solver
+      and Monte&nbsp;Carlo Credit VaR/CVaR. It is not part of the hosted site &mdash; GitHub Pages is
+      static &mdash; but you can run it alongside the app locally.
+    </p>
   </section>
+
 </main>
 
 <footer>

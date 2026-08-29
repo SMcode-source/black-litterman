@@ -1,72 +1,130 @@
 # Black-Litterman
 
-Two Black-Litterman portfolio optimisation projects in one repository: an equity model
-over the S&P 500, and an interactive credit optimiser for investment-grade corporate bonds.
+An interactive Black-Litterman optimiser for **S&P 500 equities** and **investment-grade
+credit**, in one app. It derives the returns the market already implies, blends in your own
+priors and views, and solves the constrained portfolio problem — entirely in the browser.
 
-**Live site:** https://smcode-source.github.io/black-litterman/
-**Credit optimiser (runs in your browser):** https://smcode-source.github.io/black-litterman/credit/
+**Live:** https://smcode-source.github.io/black-litterman/
+**App:** https://smcode-source.github.io/black-litterman/app/
 
-Both apply the same Bayesian core — blend market-implied equilibrium returns (reverse
-optimisation) with investor views to produce a posterior return vector, then optimise
-against it — but they target different asset classes and ship as different kinds of software.
+## What it does
 
-| | [`equity/`](equity/) | [`credit/`](credit/) |
+| | Equities | Credit |
 |---|---|---|
-| **Asset class** | S&P 500 equities (~500 names) | Investment-grade corporate bonds |
-| **Form** | Python CLI / batch analysis | Web app (React SPA + FastAPI API) |
-| **Data source** | Yahoo Finance (`yfinance`) | Bundled sample universe, or user file upload |
-| **Optimiser** | `scipy` constrained optimisation | `cvxpy` (Python) with a JS browser fallback |
-| **Outputs** | CSV exports + matplotlib charts | Interactive Recharts dashboards |
+| Universe | S&P 500 (~485 usable names) | Sample IG corporate bonds (25 issuers) |
+| Data | Yahoo Finance, refreshed every weekday | Bundled sample universe |
+| Covariance | Daily log returns, annualised | OAS × spread duration, sector/rating correlation |
+| Extra analytics | — | Expected loss, spread duration, DTS, Credit VaR |
 
-## `equity/` — S&P 500 Black-Litterman model
+Both asset classes run through the same engine (`app/src/blcore.js`). You control:
 
-Batch Python pipeline: fetches prices and market caps, derives market-implied returns from
-market-cap equilibrium weights, blends in views, and optimises with position constraints.
-Results are written to `equity/results/` as CSVs plus a summary plot.
+- **Parameters** — risk aversion δ, prior uncertainty τ, risk-free rate, min/max position weight
+- **The prior itself** — the implied equilibrium return π is shown per asset and can be hand-edited
+- **Views** — absolute ("NVDA returns 40%") or relative ("AAPL beats MSFT by 10%"), each with
+  its own confidence, which sets the corresponding diagonal entry of Ω
+
+## Why it can optimise 485 names in a browser
+
+A textbook implementation inverts the N×N covariance. At N = 485 that is ~10⁸ operations and
+will lock the tab. Two choices avoid it entirely:
+
+1. **The posterior uses the view-space form**
+
+   `μ_BL = π + τΣPᵀ(PτΣPᵀ + Ω)⁻¹(Q − Pπ)`
+
+   The only matrix inverted is **K×K**, where K is the number of views — usually two or three.
+
+2. **The posterior covariance is never materialised.** `Σ_post` is `Σ` plus a rank-K correction,
+   so it is exposed as an operator with a `mul(v)` method costing O(N² + KN). The optimiser —
+   a spectral projected gradient with Barzilai-Borwein steps — needs nothing else.
+
+The covariance is stored as `float32`. The matrix-vector product is memory-bandwidth bound
+rather than compute bound, so halving the bytes (1.88 MB → 940 KB) roughly doubled throughput.
+
+Full universe with one view: **around a second in the browser** -- roughly 1300
+projected-gradient iterations over 485 names, no worker thread, no server.
+
+## Repository layout
+
+```
+app/                  Unified React app (Vite) -- the deployed site
+  src/blcore.js         BL engine: equilibrium, views, posterior, optimiser, risk
+  src/datasets.js       Equity + credit adapters, normalised to one shape
+  src/App.jsx           UI: universe, priors & views, results
+  backend/              Optional FastAPI service (cvxpy + Monte Carlo VaR), not hosted
+data-pipeline/
+  fetch_equity_data.py  Yahoo Finance -> static snapshot
+  check_engine.mjs      Engine correctness checks, run on every deploy
+equity/               Original standalone Python batch model
+site/index.html       Landing page
+```
+
+## The data pipeline
+
+Yahoo Finance sends no CORS headers, so a static page cannot fetch it directly — every
+endpoint fails with `TypeError: Failed to fetch`. Instead the deploy workflow fetches on the
+server and ships the result as a static asset:
+
+- `equity_universe.json` — tickers, names, sectors, market caps, mean returns, vols (~90 KB)
+- `equity_cov.f32` — N×N annualised covariance, row-major float32 (~940 KB)
+
+It runs on every push and on a weekday cron at 23:00 UTC, comfortably after the US close.
+If the fetch fails the job fails by design, leaving the last good deploy serving real data
+rather than publishing an app with no universe.
+
+The snapshot is gitignored — it is a build artefact, and committing a 1 MB binary daily would
+bloat history.
+
+## Running locally
+
+```bash
+# 1. Build the data snapshot (needs network)
+python -m venv .venv-data
+./.venv-data/Scripts/pip install -r data-pipeline/requirements.txt   # Windows
+python data-pipeline/fetch_equity_data.py --out app/public/data
+
+# 2. Run the app
+cd app
+npm install
+npm run dev
+```
+
+Use `--limit 25` on the fetch script for a fast snapshot while developing. Without a snapshot
+the app shows an error banner on the equity tab; the credit side needs no external data and
+still works.
+
+To verify the engine against whatever snapshot you have:
+
+```bash
+node data-pipeline/check_engine.mjs
+```
+
+This checks the covariance is symmetric and PSD, that reverse optimisation round-trips (with
+τ→0 and no views the optimiser must return the benchmark exactly), that views move the
+posterior in the right direction and monotonically in confidence, that relative views widen
+the right spread without overshooting, that position caps bind, and that the default iteration
+budget is converged.
+
+### The optional backend
+
+`app/backend/` is a FastAPI service adding a cvxpy solver and Monte Carlo Credit VaR/CVaR.
+It is not part of the hosted site -- GitHub Pages is static, and the browser engine covers the
+hosted feature set -- but it handles constraint shapes the projected-gradient solver does not
+(turnover limits, cardinality, arbitrary linear constraints).
+
+```bash
+cd app/backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+### The original Python model
+
+`equity/` holds the standalone batch implementation the equity side grew out of. It runs the
+same method offline and writes CSVs plus a matplotlib chart.
 
 ```bash
 cd equity
 pip install -r requirements.txt
 python main.py
 ```
-
-Parameters — risk-free rate, risk premium, date range, `tau`, view confidence, min/max
-position weights — live in [`equity/config.py`](equity/config.py). Fetched data is cached in
-`equity/cache/` so reruns don't re-hit the API. See [`equity/README.md`](equity/README.md) for full detail.
-
-## `credit/` — Credit Black-Litterman optimiser
-
-Single-page React app over a FastAPI backend, adding credit-specific analytics on top of
-the BL framework: expected loss, spread duration, DTS, and Monte Carlo Credit VaR/CVaR.
-Supports absolute and relative views, issuer and sector limits, and tracking-error control.
-The frontend carries its own JavaScript engine, so it stays usable when the backend is unreachable.
-
-```bash
-# Frontend
-cd credit
-npm install
-npm run dev
-
-# Backend (separate shell)
-cd credit/backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-Set `VITE_API_URL=http://localhost:8000` in `credit/.env` to point the frontend at your local
-backend. See [`credit/README.md`](credit/README.md) for the deployed URLs, environment
-variables, and module-by-module breakdown.
-
-## Repository notes
-
-- Each project keeps its own `requirements.txt` and README; there is no shared build step
-  and no cross-imports between the two.
-- Generated artefacts — `equity/cache/`, `equity/raw_data/`, `equity/results/`, `node_modules/`,
-  virtualenvs — are gitignored and recreated by running the projects.
-- The site is built and deployed by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
-  on every push to `main`: it builds the credit app and serves it at `/credit/` under the
-  landing page in [`site/index.html`](site/index.html). The app is built without `VITE_API_URL`,
-  so the published version runs its browser engine and needs no backend.
-- `equity/market_implied_returns/` holds a small set of standalone output CSVs carried over
-  from the original project. Nothing in this repo regenerates them, so they are tracked in git
-  rather than gitignored like the other outputs.
