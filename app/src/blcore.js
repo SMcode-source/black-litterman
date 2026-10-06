@@ -316,7 +316,17 @@ function spectralNorm(op, n, iters = 24) {
  * so 500 names cost ~250k multiply-adds per step -- a few hundred steps runs in
  * well under a second.
  */
-export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, iters = 2000, tol = 1e-9 }) {
+// Iteration budget. The solver stops as soon as it is stationary (see the
+// residual below), so this is a ceiling, not the usual cost: a run that reaches
+// it has NOT converged. 2000 was enough on the snapshots up to 2026-09-26
+// (no-view solves stopped at ~1,500), but once a stock listed in July 2021
+// passed the coverage filter the common window moved to 2021-07-29 and the
+// no-view solve needed 1,981-2,861 iterations for tau 0.025-0.1 (measured on
+// the 2026-10-06 snapshot), so check 1b failed on whichever nights it ran out.
+// 5000 is ~1.75x the slowest measured case.
+export const DEFAULT_ITERS = 5000;
+
+export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, iters = DEFAULT_ITERS, tol = 1e-9 }) {
   // Spectral projected gradient (Barzilai-Borwein steps).
   //
   // A fixed 1/L step is far too conservative here: equity covariances are badly
@@ -349,6 +359,7 @@ export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, ite
 
   gradInto(w, g);
   let itersRun = 0;
+  let converged = false;
 
   // Stationarity residual, checked every CHECK_EVERY iterations.
   //
@@ -381,7 +392,7 @@ export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, ite
 
     // `w` and `g` are consistent here, so this tests the iterate we would
     // return, and breaking leaves the answer already in `w`.
-    if (it % CHECK_EVERY === 0 && stationarity() < tol) break;
+    if (it % CHECK_EVERY === 0 && stationarity() < tol) { converged = true; break; }
 
     for (let i = 0; i < n; i++) cand[i] = w[i] - alpha * g[i];
     projectToSimplexBox(cand, lo, hi, n, next);
@@ -390,7 +401,7 @@ export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, ite
     for (let i = 0; i < n; i++) shift += Math.abs(next[i] - w[i]);
     // An exactly zero step is a fixed point of the projected map, so w is
     // already stationary regardless of alpha.
-    if (shift === 0) break;
+    if (shift === 0) { converged = true; break; }
 
     gradInto(next, gNext);
 
@@ -410,7 +421,7 @@ export function optimise({ mu, sigmaOp, delta, n, lo = 0, hi = 1, w0 = null, ite
     const tw = w; w = next; next = tw;      // swap, no allocation
     const tg = g; g = gNext; gNext = tg;
   }
-  return { w, iters: itersRun, status: "spectral_projected_gradient" };
+  return { w, iters: itersRun, converged, status: "spectral_projected_gradient" };
 }
 
 // ---------------------------------------------------------------------------
