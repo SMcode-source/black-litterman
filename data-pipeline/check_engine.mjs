@@ -19,7 +19,7 @@
  */
 import { readFileSync } from "node:fs";
 import {
-  equilibriumReturns, buildViews, posterior, optimise,
+  equilibriumReturns, buildViews, posterior, optimise, DEFAULT_ITERS,
   portfolioStats, matVec, dot,
 } from "../app/src/blcore.js";
 
@@ -105,13 +105,17 @@ console.log("\n1b. Convergence (tau = 0.05, budget vs 10x budget)");
 const p0 = posterior(cov, pi, [], tau, n);
 // `short` uses the shipped default budget -- that is the thing under test.
 const short = optimise({ mu: p0.muBL, sigmaOp: p0.sigmaOp, delta, n, lo, hi, w0: wBmk });
-const long = optimise({ mu: p0.muBL, sigmaOp: p0.sigmaOp, delta, n, lo, hi, w0: wBmk, iters: 20000 });
-console.log(`     default budget ran ${short.iters} iterations`);
+const long = optimise({ mu: p0.muBL, sigmaOp: p0.sigmaOp, delta, n, lo, hi, w0: wBmk, iters: DEFAULT_ITERS * 10 });
+console.log(`     default budget ran ${short.iters} of ${DEFAULT_ITERS} iterations`);
 let drift = 0;
 for (let i = 0; i < n; i++) drift = Math.max(drift, Math.abs(short.w[i] - long.w[i]));
 const sShort = portfolioStats({ w: short.w, wBmk, mu: p0.muBL, cov, sigmaOp: p0.sigmaOp, n });
 console.log(`     default budget TE = ${pct(sShort.te)} (tau-driven min-variance tilt, expected > 0)`);
 check("stable under 10x iterations", drift < 1e-4, `max weight drift = ${pct(drift)}`);
+// A run that used its whole budget stopped because it ran out, not because it
+// was done; drift alone can pass such a run by luck (it did on 2026-09-30).
+check("converges within the default budget", short.converged,
+  `${short.iters} of ${DEFAULT_ITERS} iterations`);
 
 // --- 2. absolute view moves the right name --------------------------------
 console.log("\n2. Absolute view: NVDA returns 40%");

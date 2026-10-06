@@ -225,7 +225,7 @@ export default function App() {
       const { muBL, sigmaOp, viewImpact, singular } =
         posterior(ds.cov, effectivePrior, viewRows, P.tau, ds.n);
 
-      const { w, iters } = optimise({
+      const { w, iters, converged } = optimise({
         mu: muBL, sigmaOp, delta: P.delta, n: ds.n,
         lo: P.minW, hi: P.maxW, w0: ds.wBmk,
       });
@@ -253,7 +253,7 @@ export default function App() {
       setResults((r) => ({
         ...r,
         [assetClass]: {
-          rows, stats, priorStats, extras, iters, viewImpact, singular,
+          rows, stats, priorStats, extras, iters, converged, viewImpact, singular,
           n: ds.n,
           sectors: groupWeights(ds.items, w, ds.wBmk, "sector"),
           ratings: ds.key === "credit" ? groupWeights(ds.items, w, ds.wBmk, "ratingBucket") : null,
@@ -767,7 +767,7 @@ function Results({ r, unit, params }) {
           <>
             <Tile label="Names held" value={heldCount} sub={`of ${r.n} selected`} />
             <Tile label="Benchmark Sharpe" value={priorStats.sharpe.toFixed(2)} sub="on your prior returns" />
-            <Tile label="Solve time" value={r.ms} unit="ms" sub={`${r.iters} iterations`} />
+            <Tile label="Solve time" value={r.ms} unit="ms" sub={`${r.iters} iterations${r.converged ? "" : ", not converged"}`} />
           </>
         )}
       </div>
@@ -776,9 +776,15 @@ function Results({ r, unit, params }) {
         <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
           {r.n} assets · {r.viewCount} view{r.viewCount === 1 ? "" : "s"}
         </span>
-        <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700">
-          Solved in {r.ms} ms ({r.iters} iterations)
-        </span>
+        {r.converged ? (
+          <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700">
+            Solved in {r.ms} ms ({r.iters} iterations)
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">
+            Stopped at the {r.iters}-iteration limit without converging ({r.ms} ms)
+          </span>
+        )}
         <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
           δ {params.delta} · τ {params.tau} · cap {pct(params.maxW, 0)}
         </span>
